@@ -8,6 +8,7 @@ from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.dummy import DummyClassifier
 import warnings
+import xgboost as xgb
 
 def evaluate_model_transfer(data_folder, parts, window_size=0.1, train_window_center=0.2, 
                             null_window_center=-0.2, new_framerate=float('inf'), classifier='multiclass-svm', 
@@ -135,6 +136,8 @@ def train_multiclass_classifier(features, labels, classifier, classifier_param):
         model = DummyClassifier(strategy='most_frequent')
     elif classifier == 'always1Dummy':
         model = DummyClassifier(strategy='constant', constant=1)
+    elif classifier == 'xgboost':
+        model = xgb.XGBClassifier(n_estimators=int(classifier_param), use_label_encoder=False, eval_metric='mlogloss')
     else:
         raise ValueError(f"Unsupported classifier: {classifier}")
     
@@ -153,9 +156,11 @@ def get_default_classifier_param(classifier):
         return 5  # Default number of neighbors
     elif classifier in ['mostFrequentDummy', 'always1Dummy']:
         return None
+    elif classifier == 'xgboost':
+        return 100  # Default number of boosting iterations
     else:
         raise ValueError(f"Unsupported classifier: {classifier}")
 
 if __name__ == '__main__':
-    acc = evaluate_model_transfer(r'.', 2, null_window_center=np.nan, classifier='multiclass-svm')
+    acc = evaluate_model_transfer(r'.', 2, classifier='xgboost', components_pca=200)
     print(acc)
