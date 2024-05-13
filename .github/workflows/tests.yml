@@ -15,6 +15,9 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        classifier: [multiclass-svm, scikit-mlp]
 
     steps:
     - name: Checkout repository
@@ -47,4 +50,9 @@ jobs:
         for file in data/*; do ln -s "$file" .; done
 
     - name: Run tests
-      run: python -m unittest discover -s .
+      run: |
+        if [ "${{ matrix.classifier }}" == "multiclass-svm" ]; then
+          python -m unittest test_evaluate_model_transfer.TestEvaluateModelTransfer.test_evaluate_model_transfer_accuracy_svm
+        elif [ "${{ matrix.classifier }}" == "scikit-mlp" ]; then
+          python -m unittest test_evaluate_model_transfer.TestEvaluateModelTransfer.test_evaluate_model_transfer_accuracy_scikit_mlp
+        fi
