@@ -7,6 +7,7 @@ from sklearn.svm import SVC
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.dummy import DummyClassifier
+from sklearn.neural_network import MLPClassifier
 import warnings
 import xgboost as xgb
 
@@ -14,7 +15,7 @@ def evaluate_model_transfer(data_folder, parts, window_size=0.1, train_window_ce
                             null_window_center=-0.2, new_framerate=float('inf'), classifier='multiclass-svm', 
                             classifier_param=np.nan, components_pca=100, frequency_range=(0, float('inf'))):
 
-    if np.isnan(classifier_param):
+    if np.all(np.isnan(classifier_param)):
         classifier_param = get_default_classifier_param(classifier)
     
     train_exp_data = sio.loadmat(f'{data_folder}/Part{parts}Data.mat')['data'][0]
@@ -143,6 +144,8 @@ def train_multiclass_classifier(features, labels, classifier, classifier_param):
         model = DummyClassifier(strategy='constant', constant=1)
     elif classifier == 'xgboost':
         model = xgb.XGBClassifier(n_estimators=int(classifier_param), use_label_encoder=False, eval_metric='mlogloss')
+    elif classifier == 'scikit-mlp':
+        model = MLPClassifier(hidden_layer_sizes=int(classifier_param[0]), max_iter=int(classifier_param[1]))
     else:
         raise ValueError(f"Unsupported classifier: {classifier}")
     
@@ -163,6 +166,8 @@ def get_default_classifier_param(classifier):
         return None
     elif classifier == 'xgboost':
         return 100  # Default number of boosting iterations
+    elif classifier == 'scikit-mlp':
+        return (100, 1000)
     else:
         raise ValueError(f"Unsupported classifier: {classifier}")
 
