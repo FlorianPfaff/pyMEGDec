@@ -36,6 +36,11 @@ def evaluate_model_transfer(data_folder, parts, window_size=0.1, train_window_ce
 
     features_train_exp = np.hstack(stimuli_features_train_exp + null_features_train_exp).T
     labels_train_exp = np.concatenate((labels_train_exp, np.zeros(len(null_features_train_exp), dtype=int)))
+    if np.isnan(train_window_center):
+        """ Subtract 1 from the labels because there is no null data in the validation experiment 
+        and some classifiers do not labels starting from 0."""
+        labels_train_exp -= 1
+        labels_val_exp -= 1
 
     features_val_exp = np.hstack(stimuli_features_val_exp).T
     
