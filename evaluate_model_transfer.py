@@ -162,5 +162,5 @@ def get_default_classifier_param(classifier):
         raise ValueError(f"Unsupported classifier: {classifier}")
 
 if __name__ == '__main__':
-    acc = evaluate_model_transfer(r'.', 2, classifier='xgboost', components_pca=200)
+    acc = evaluate_model_transfer(r'.', 2, classifier='multiclass-svm', components_pca=100)
     print(acc)
