@@ -179,7 +179,7 @@ def train_multiclass_classifier(features, labels, classifier, classifier_param):
 
         trainer = pl.Trainer(
             max_epochs=int(classifier_param["max_epochs"]),
-            default_root_dir=r"C:\Users\emper\lightning_logs",
+            default_root_dir=r"lightning_logs",
             callbacks=[pl.callbacks.EarlyStopping(monitor='val_loss', patience=10)]
         )
        
