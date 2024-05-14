@@ -41,12 +41,16 @@ jobs:
         key: ${{ runner.os }}-data
   
     - name: Download Data
+      if: steps.cache-data.outputs.cache-hit != 'true'
       run: |
         mkdir -p data
         cd data
         wget -q ${{ secrets.DOWNLOAD_URL }}
         wget -q ${{ secrets.DOWNLOAD_URL_CUE }}
         cd ..
+
+    - name: Copy Data to Current Working Directory
+      run: |
         for file in data/*; do ln -s "$file" .; done
 
     - name: Run tests
