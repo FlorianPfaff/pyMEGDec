@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        classifier: [multiclass-svm, scikit-mlp]
+        classifier: [multiclass-svm, scikit-mlp, pytorch-mlp]
 
     steps:
     - name: Checkout repository
@@ -31,7 +31,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install numpy scipy scikit-learn xgboost
+        pip install numpy scipy scikit-learn xgboost pytorch-lightning
 
     - name: Cache downloaded data
       id: cache-data
@@ -55,4 +55,9 @@ jobs:
           python -m unittest test_evaluate_model_transfer.TestEvaluateModelTransfer.test_evaluate_model_transfer_accuracy_svm
         elif [ "${{ matrix.classifier }}" == "scikit-mlp" ]; then
           python -m unittest test_evaluate_model_transfer.TestEvaluateModelTransfer.test_evaluate_model_transfer_accuracy_scikit_mlp
+        elif [ "${{ matrix.classifier }}" == "pytorch-mlp" ]; then
+          python -m unittest test_evaluate_model_transfer.TestEvaluateModelTransfer.test_evaluate_model_transfer_accuracy_pytorch_mlp
+        else
+          echo "Invalid classifier"
+          exit 1
         fi

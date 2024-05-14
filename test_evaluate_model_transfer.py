@@ -20,5 +20,11 @@ class TestEvaluateModelTransfer(unittest.TestCase):
         
         self.assertGreaterEqual(accuracy, 0.09, "Accuracy should be at least 0.09")
 
+    def test_evaluate_model_transfer_accuracy_pytorch_mlp(self):
+        classifier = 'pytorch-mlp'
+        accuracy = evaluate_model_transfer(self.data_folder, self.parts, null_window_center=self.null_window_center, classifier=classifier, components_pca=200)
+        
+        self.assertGreaterEqual(accuracy, 0.15, "Accuracy should be at least 0.15")
+
 if __name__ == '__main__':
     unittest.main()

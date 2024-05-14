@@ -1,8 +1,13 @@
+import pytorch_lightning as pl
+from torch.utils.data import DataLoader, TensorDataset, random_split
+from torch import optim
+import torch.nn as nn
 import numpy as np
 import scipy.io as sio
 from scipy.signal import butter, filtfilt
 from scipy.interpolate import interp1d
 from sklearn.decomposition import PCA
+import torch
 from sklearn.svm import SVC
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.neighbors import KNeighborsClassifier
@@ -15,7 +20,7 @@ def evaluate_model_transfer(data_folder, parts, window_size=0.1, train_window_ce
                             null_window_center=-0.2, new_framerate=float('inf'), classifier='multiclass-svm', 
                             classifier_param=np.nan, components_pca=100, frequency_range=(0, float('inf'))):
 
-    if np.all(np.isnan(classifier_param)):
+    if not isinstance(classifier_param, dict) and np.all(np.isnan(classifier_param)):
         classifier_param = get_default_classifier_param(classifier)
     
     train_exp_data = sio.loadmat(f'{data_folder}/Part{parts}Data.mat')['data'][0]
@@ -55,7 +60,6 @@ def evaluate_model_transfer(data_folder, parts, window_size=0.1, train_window_ce
 
     accuracy = np.mean(predictions_val_exp == labels_val_exp)
     return accuracy
-
 
 def preprocess_features(data, frequency_range, new_framerate, window_size, train_window_center, null_window_center):
     data = filter_features(data, frequency_range[0], frequency_range[1])
@@ -146,6 +150,42 @@ def train_multiclass_classifier(features, labels, classifier, classifier_param):
         model = xgb.XGBClassifier(n_estimators=int(classifier_param), use_label_encoder=False, eval_metric='mlogloss')
     elif classifier == 'scikit-mlp':
         model = MLPClassifier(hidden_layer_sizes=int(classifier_param[0]), max_iter=int(classifier_param[1]))
+    elif classifier == 'pytorch-mlp':
+        # Define model dimensions
+        input_dim = features.shape[1]
+        output_dim = len(np.unique(labels))
+
+        # Instantiate the model
+        model = MLPClassifierTorch(input_dim, int(classifier_param["hidden_dim"]),
+                                   output_dim, learning_rate=classifier_param["learning_rate"],
+                                   dropout_rate=classifier_param["dropout_rate"])
+
+        # Create the full dataset
+        full_dataset = TensorDataset(torch.tensor(features, dtype=torch.float32), 
+                                    torch.tensor(labels, dtype=torch.long))
+
+        # Define the size of training and validation datasets
+        train_size = int(0.8 * len(full_dataset))
+        val_size = len(full_dataset) - train_size
+
+        # Split the dataset into training and validation sets
+        train_dataset, val_dataset = random_split(full_dataset, [train_size, val_size])
+
+        # Create data loaders for training and validation sets
+        train_loader = DataLoader(train_dataset, batch_size=8, shuffle=True)
+        val_loader = DataLoader(val_dataset, batch_size=8, shuffle=False)
+
+        # Configure the trainer to use the GPU
+
+        trainer = pl.Trainer(
+            max_epochs=int(classifier_param["max_epochs"]),
+            default_root_dir=r"C:\Users\emper\lightning_logs",
+            callbacks=[pl.callbacks.EarlyStopping(monitor='val_loss', patience=10)]
+        )
+       
+        # Train the model
+        trainer.fit(model, train_loader, val_loader)
+        return model
     else:
         raise ValueError(f"Unsupported classifier: {classifier}")
     
@@ -167,9 +207,59 @@ def get_default_classifier_param(classifier):
     elif classifier == 'xgboost':
         return 100  # Default number of boosting iterations
     elif classifier == 'scikit-mlp':
-        return (100, 1000)
+        return (150, 1000)
+    elif classifier == 'pytorch-mlp':
+        return {'hidden_dim': 720, 'max_epochs': 500, 'learning_rate': 1e-3, 'dropout_rate': 0.2}
     else:
         raise ValueError(f"Unsupported classifier: {classifier}")
+
+
+class MLPClassifierTorch(pl.LightningModule):
+    def __init__(self, input_dim, hidden_dim, output_dim, learning_rate=1e-3, dropout_rate=0.2):
+        super(MLPClassifierTorch, self).__init__()
+        self.layer_1 = nn.Linear(input_dim, hidden_dim)
+        self.layer_2 = nn.Linear(hidden_dim, hidden_dim)
+        self.layer_3 = nn.Linear(hidden_dim, output_dim)
+        self.learning_rate = learning_rate
+        self.dropout = nn.Dropout(dropout_rate)
+        self.relu = nn.ReLU()       
+        self.criterion = nn.CrossEntropyLoss()
+
+    def forward(self, x):
+        x = self.relu(self.layer_1(x))
+        x = self.dropout(x)
+        x = self.relu(self.layer_2(x))
+        x = self.dropout(x)
+        x = self.layer_3(x)
+        return x
+    
+    def predict(self, x):
+        x = torch.tensor(x, dtype=torch.float32)
+        self.eval()  # Set the model to evaluation mode
+        with torch.no_grad():  # Disable gradient computation
+            predictions = self.relu(self.layer_1(x))
+            predictions = self.relu(self.layer_2(predictions))
+            predictions = self.layer_3(predictions)
+        return torch.argmax(predictions, dim=1).numpy()
+
+    def training_step(self, batch, batch_idx):
+        x, y = batch
+        y_hat = self.forward(x)
+        loss = self.criterion(y_hat, y)
+        self.log('train_loss', loss)
+        return loss
+
+    def validation_step(self, batch, batch_idx):
+        x, y = batch
+        y_hat = self.forward(x)
+        loss = self.criterion(y_hat, y)
+        self.log('val_loss', loss)
+        return loss
+
+    def configure_optimizers(self):
+        optimizer = optim.Adam(self.parameters(), lr=1e-3, weight_decay=1e-4)
+        return optimizer
+
 
 if __name__ == '__main__':
     acc = evaluate_model_transfer(r'.', 2, classifier='multiclass-svm', components_pca=100)
