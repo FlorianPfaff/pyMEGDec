@@ -59,7 +59,13 @@ def evaluate_model_transfer(data_folder, parts, window_size=0.1, train_window_ce
     predictions_val_exp = model.predict(features_val_exp)
 
     accuracy = np.mean(predictions_val_exp == labels_val_exp)
-    return accuracy
+
+    svm_coefficients = model.coef_
+    pca_pseudoinverse = np.linalg.pinv(coeff[:, :components_pca])
+    original_feature_importance = pca_pseudoinverse.T @ svm_coefficients.T
+    original_feature_importance = original_feature_importance.T  # Transpose to match dimensions
+
+    return accuracy, original_feature_importance
 
 def preprocess_features(data, frequency_range, new_framerate, window_size, train_window_center, null_window_center):
     data = filter_features(data, frequency_range[0], frequency_range[1])
@@ -135,7 +141,7 @@ def reduce_features_pca(features, n_components):
 
 def train_multiclass_classifier(features, labels, classifier, classifier_param):
     if classifier == 'multiclass-svm':
-        model = SVC(C=classifier_param, probability=True)
+        model = SVC(C=classifier_param, probability=True, kernel='linear')
     elif classifier == 'random-forest':
         model = RandomForestClassifier(n_estimators=int(classifier_param))
     elif classifier == 'gradient-boosting':
@@ -262,5 +268,5 @@ class MLPClassifierTorch(pl.LightningModule):
 
 
 if __name__ == '__main__':
-    acc = evaluate_model_transfer(r'.', 2, classifier='multiclass-svm', components_pca=100)
+    acc = evaluate_model_transfer(r'.', 2, classifier='multiclass-svm', components_pca=np.inf)
     print(acc)
