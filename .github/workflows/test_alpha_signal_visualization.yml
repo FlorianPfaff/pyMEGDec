@@ -1,0 +1,59 @@
+name: Python Tests for Alpha Signal Visualization
+
+permissions:
+  contents: read
+  checks: write
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        classifier: [multiclass-svm, scikit-mlp, pytorch-mlp]
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install numpy scipy scikit-learn xgboost pytorch-lightning
+
+    - name: Cache downloaded data
+      id: cache-data
+      uses: actions/cache@v4
+      with:
+        path: data
+        key: ${{ runner.os }}-data
+  
+    - name: Download Data
+      if: steps.cache-data.outputs.cache-hit != 'true'
+      run: |
+        mkdir -p data
+        cd data
+        wget -q ${{ secrets.DOWNLOAD_URL }}
+        wget -q ${{ secrets.DOWNLOAD_URL_CUE }}
+        cd ..
+
+    - name: Copy Data to Current Working Directory
+      run: |
+        for file in data/*; do ln -s "$file" .; done
+
+    - name: Run tests
+      run: |
+        python -m unittest test_show_bandpass_signal_and_shifts.TestAlphaChannelMethods
+        
